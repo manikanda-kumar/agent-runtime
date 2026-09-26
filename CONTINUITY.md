@@ -6,10 +6,11 @@ Build understanding, then design, an internal **agent runtime** for async Jira t
 ## Constraints/Assumptions
 - Internal use; audit trail and on-behalf-of identity matter.
 - Buy the sandbox substrate; build the control plane.
+- **Deployment context (per owner, 2026-09-26): AWS-native enterprise.** Consequence: T3 default shifts E2B-cloud → AWS Lambda MicroVMs (in-perimeter: IAM/VPC/CloudTrail; Bedrock keeps model egress in AWS; 8h preserved-state cap absorbed by §4.4 checkpointing). Self-host E2B = rehearsed fallback, raw Firecracker = anti-goal. Bake-off criteria unchanged.
 - Prior context: `tools` MCP blueprint (stable gateway + HA replicas + Firecracker per-job isolation; runtime/gateway bake-off pending); `sandboxagent` project (Session→Runner→Worktree→Optional Sandbox layering; agentOS as substrate, not state).
 
 ## Key decisions
-- ARCHITECTURE.md (committed): buy substrate (E2B default T3), build control plane (Record+Journal in Postgres, channel adapters, policy/approval gates, 4-tier Executor). §7 open questions closed: (1) bake-off criteria set, gate at M1; (2) GPUs parked; (3) own journal w/ Temporal discipline, Temporal = named escape hatch; (4) code-mode in control-plane isolates, no creds in sandboxes; (5) residency via architecture + data classes, self-host E2B as rehearsed insurance.
+- ARCHITECTURE.md v1.1 (committed): buy substrate, build control plane (Record+Journal in Postgres, channel adapters, policy/approval gates, 4-tier Executor). §7 open questions closed: (1) bake-off criteria set, gate at M1 — **T3 default = Lambda MicroVMs in the AWS enterprise, E2B elsewhere/fallback**; (2) GPUs parked (Bedrock = in-perimeter inference); (3) own journal w/ Temporal discipline, Temporal = named escape hatch; (4) code-mode in control-plane isolates, no creds in sandboxes; (5) residency via architecture + data classes; plus §10.6 capacity strategy: reserve floor not peak, tier gradient = reserve pool, SP≠capacity.
 
 ## State
 - `RESEARCH.md` + `ARCHITECTURE.md` committed on origin/main. Research doc: full history, agent-era three waves, six broken assumptions, requirements mapping, build-vs-buy split. Architecture doc: control-plane design + §10 closes all 5 open questions with reversal triggers.

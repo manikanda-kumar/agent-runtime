@@ -1,6 +1,6 @@
 # Architecture: The Internal Agent Runtime
 
-**Date:** 2026-09-26 · **Status:** Design v1, pre-build · **Predecessor:** [RESEARCH.md](RESEARCH.md) — its §5/§6 are the settled direction. This doc turns them into a system and closes the five open questions from its §7.
+**Date:** 2026-09-26 · **Status:** Design v1.1, accepted · **Amended:** 2026-09-26 — AWS-native enterprise deployment context (§10.1 default, §10.5 order, new §10.6 capacity strategy) · **Predecessor:** [RESEARCH.md](RESEARCH.md) — its §5/§6 are the settled direction. This doc turns them into a system and closes the five open questions from its §7.
 
 ---
 
@@ -10,7 +10,7 @@ Buy the substrate, build the control plane. The control plane has four parts:
 
 1. **The Record** — a durable session/task store (Postgres) with an append-only, hash-chained journal of every step. This is the product.
 2. **Channels** — Jira/Slack/GitHub adapters that normalize every ingress event into one task envelope and render everything outbound as native comments and status transitions.
-3. **The Executor** — one interface over a four-tier isolation gradient (interpreter → isolate → container → microVM), rented, with E2B as the default microVM provider.
+3. **The Executor** — one interface over a four-tier isolation gradient (interpreter → isolate → container → microVM), rented, with Lambda MicroVMs as the default microVM provider in our AWS deployment (E2B elsewhere).
 4. **Policy & identity** — task-scoped short-lived credentials, a per-call policy gate, durable human-approval waits, and a kill switch.
 
 Held together by one invariant: **no internal-API credential ever exists inside a sandbox.** Sandboxes receive a worktree and a task brief; all internal traffic flows through the control plane's connector gateway, where it is policy-checked and journaled.
@@ -19,7 +19,7 @@ The five open questions, closed (details and reversal triggers in §10):
 
 | # | Question | Decision |
 |---|---|---|
-| 1 | Substrate bake-off criteria | **E2B is the default from day one.** Criteria defined now (§10.1); a formal bake-off (E2B vs Modal vs Vercel Sandbox) is a decision gate at M1. The Executor interface keeps two providers warm regardless of who wins. |
+| 1 | Substrate bake-off criteria | **Default T3: AWS Lambda MicroVMs** in our AWS-enterprise deployment; **E2B** remains the default elsewhere and the rehearsed self-host fallback (§10.1, §10.5, §10.6). Criteria defined now; the formal bake-off is a decision gate at M1. The Executor interface keeps two providers warm regardless of who wins. |
 | 2 | Do we need GPUs? | **Parked: no.** Triage runs on hosted model APIs. Re-open only on a no-egress data mandate (→ Modal GPUs, same platform as their sandboxes) or measured cost/latency pain at M1 review. |
 | 3 | Durable-execution engine | **Our own journal in Postgres**, built with Temporal's discipline (idempotent steps, durable timers, fencing tokens). The journal is mandatory scope anyway — the engine is the marginal 20%. Temporal is the named escape hatch with explicit adoption triggers; WDK parked behind it. |
 | 4 | Code-mode executor placement | **Control-plane isolate per execution**, behind the connector gateway (§10.4). Per-session sandboxes never mediate internal-API access. Interim: a locked-down container profile until the isolate runtime lands. |
@@ -237,7 +237,7 @@ interface Executor {
 | **T0 — interpreter** | just-bash (bash re-implemented in TS, in-memory fs, no host access) | language-level | dry-running generated shell, simulated ops | in-process, control plane |
 | **T1 — isolate** | V8-isolate runtime (workerd-class; Cloudflare Dynamic Worker Loader is the reference model) | V8 sandbox, no network by default | **code-mode connector execution** (§10.4) | control plane — the one tier with real build cost |
 | **T2 — container** | k8s Job + gVisor | user-space kernel | **restricted** data class; bulk internal work; the poor-man's tier | our cluster |
-| **T3 — microVM** | Firecracker, via **E2B** (default) | hardware (KVM) | default for untrusted model code needing a full toolchain | rented |
+| **T3 — microVM** | Firecracker, via **Lambda MicroVMs** (AWS deployment) or **E2B** (elsewhere) | hardware (KVM) | default for untrusted model code needing a full toolchain | rented |
 
 Selection: cheapest tier satisfying the task's data class (§10.5) and capability need. Default is T3; T2 when the data class forbids third-party substrate; T1/T0 are for mediation, not task execution.
 
@@ -309,7 +309,7 @@ Keep the layering. Add the control plane.
 
 ### 10.1 Substrate bake-off — criteria set now, gate at M1
 
-**Decision: E2B is the default T3 provider starting immediately.** Category default, open-source Apache-2.0 infra (the self-host insurance policy §10.5 needs), pause/resume as the core API with paused sandboxes kept indefinitely, production proof at Devin (Outposts) and Stripe, and it's already tracked in our knowledge base. The bake-off benchmarks challengers — **Modal** (gVisor, the 100k-concurrency elasticity story, GPUs if §10.2 re-opens) and **Vercel Sandbox** (Firecracker "Hive", GA Jan 2026, the Cursor Cloud Agents precedent) — against the default; switching costs are low because the Executor interface exists first. Lambda MicroVMs enter only under an AWS-consolidation mandate (and must then accept the 8h preserved-state cap, §4.4). Cloudflare enters only if we ever rebuild the control plane on Durable Objects — §10.3 says we don't.
+**Decision (amended 2026-09-26 for deployment context):** the target environment is an **AWS-native enterprise**, so the T3 default there is **AWS Lambda MicroVMs** — managed, zero-ops, and inside the AWS org boundary (IAM/VPC/CloudTrail), which collapses most of the security and procurement review. Its 8h preserved-state cap is absorbed by §4.4 checkpointing (resume = fresh microVM + restore), and pairing it with Bedrock for model calls keeps even inference egress in-perimeter — which keeps §10.2 parked. **E2B remains the default outside this context and the rehearsed self-host fallback within it:** open-source Apache-2.0 infra, pause-forever semantics that fit human-timescale waits best, production proof at Devin (Outposts) and Stripe. The bake-off below still runs — the criteria are provider-neutral — with **Modal** (gVisor, the 100k-concurrency elasticity story, GPUs if §10.2 re-opens) and **Vercel Sandbox** (Firecracker "Hive", GA Jan 2026, the Cursor Cloud Agents precedent) as challengers; switching costs stay low because the Executor interface exists first. Cloudflare enters only if we ever rebuild the control plane on Durable Objects — §10.3 says we don't.
 
 **Criteria** (pass/fail against targets, then cost at our usage mix as tiebreak):
 
@@ -325,6 +325,7 @@ Keep the layering. Add the control plane.
 | Self-host / BYOC path | exists and is rehearsed | residency insurance (§10.5) |
 | AX | agent-drivable SDK/CLI, machine-readable docs | §2.7 |
 | Failure semantics | stated durability of paused sandboxes under provider incidents | §4.4 assumes loss is possible |
+| Sustained create rate at floor concurrency under regional constraint | ≥ the §10.6 floor during quota/capacity pressure | shortage behavior is the whole point of the floor; measure, don't trust marketing |
 
 **Reversal trigger:** bake-off failure on any pass/fail criterion → promote the challenger that passes; cost tiebreak only among passers.
 
@@ -360,11 +361,32 @@ The key structural fact: **channel data (Jira, Slack, GitHub content) never ente
 |---|---|---|
 | `public` | OSS repos | any tier, any provider |
 | `internal` | normal product repos | T3 rented is acceptable (code egress under contract review at M1); T2 always acceptable |
-| `restricted` | embargoed/customer/regulated work | T2 internal or self-hosted E2B **only**; no third-party substrate, no model-API egress (trips §10.2's GPU trigger) |
+| `restricted` | embargoed/customer/regulated work | T2 internal or **in-account** substrate (Lambda MicroVMs) only; no third-party substrate providers; model calls via in-perimeter Bedrock only |
 
-We run **managed E2B** from day one — self-hosting before a hard requirement lands is an ops tax paid for an option we already own. The insurance is that E2B's infra is Apache-2.0 and self-hostable; at M2 we rehearse the migration once so the switch is measured in days. If an everything-in-our-AWS-account mandate ever lands, the order of preference is: self-hosted E2B, then Lambda MicroVMs (accepting the 8h preserved-state cap and checkpoint-restore flows, §4.4).
+**Amended (2026-09-26):** the deployment context *is* an AWS-native enterprise, so the preference order is exercised, not hypothetical — **Lambda MicroVMs first** (managed, in-perimeter; §10.1), **self-hosted E2B second** (rehearsed at M2, flipped to if pause-forever economics or API fit ever beat the managed primitive), **raw Firecracker never** (§11 anti-goal). Self-hosting E2B before that flip is an ops tax paid for an option we already own; the insurance is that the infra is Apache-2.0 and the migration is rehearsed once, so the switch is measured in days.
 
 **Reversal trigger:** a signed customer/regulatory residency requirement → execute the rehearsed self-host plan; the control plane doesn't change.
+
+### 10.6 Capacity strategy — reserve the floor, share the peak (added 2026-09-26)
+
+**Decision: no large static reserve pool.** Two properties of this system make hoarding the wrong answer:
+
+1. **The workload is delay-tolerant by design.** A capacity miss is just another `waiting_timer` state (§4.2) — an agent that waits 90 seconds for compute while its human approver is at lunch loses nothing. Backpressure is free. What a reserve pool buys (sub-second admission guarantees) is something an async, comment-driven workload doesn't need.
+2. **The tier gradient is the reserve pool.** Under CPU scarcity: T2 (k8s+gVisor, on cluster capacity the enterprise already owns) absorbs overflow; T3 queues; the journal doesn't care. Scarcity becomes a routing decision, not a procurement ticket. (This is also why metal-based self-host reserves are a bad deal — bare metal bills for the whole box, 24/7, at floor utilization.)
+
+AWS levers, in the order to pull them:
+
+| Lever | When | Idle cost |
+|---|---|---|
+| Raise Lambda concurrency quota (support ticket) | day one, before it's needed | $0 |
+| Reserved concurrency on the agent fleet | shields sandboxes from other Lambda workloads in the same account | $0 |
+| Multi-region deployment | regional constraint events; doubles as a residency lever | ~$0 |
+| Small provisioned-concurrency floor | only if cold starts measurably miss the §10.1 p95 target | pays — keep it tiny |
+| ODCRs on metal + Savings Plans (only if the self-host E2B fallback flips) | floor only, across 2 AZs | this *is* the reserve pool — size it to the floor |
+
+**Trap:** Savings Plans are a discount, not a capacity guarantee — only ODCRs/Capacity Blocks actually hold machines. Conflating them is how teams discover their "reserve" was a coupon.
+
+**Operating habit:** start at zero reserve; dogfood through M0/M1; then set the floor at ~p70 of observed peak-day concurrency and review quarterly as adoption grows. In a genuine shortage, AWS's shared pool usually absorbs bursts better than a small private pool — reservations exist to protect the floor, not the ceiling. Bake-off criterion added in §10.1: sustained create rate under regional constraint, measured.
 
 ---
 
