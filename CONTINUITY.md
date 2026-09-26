@@ -23,8 +23,8 @@ Build understanding, then design, an internal **agent runtime** for async Jira t
 - Video prompt guidance gathered: storyboard + visual direction + energy pacing in the prompt = reliable one-shot (Addy Osmani thread; trq212: "10k characters with good takes plus skills, examples"); evan.romeos.cc leidenfrost transcript = reference workflow (HTML film → visual QA pass → narration FIRST → retime → render → sound design); alesha-pro SKILL.md = production playbook (brief template, beat sheet, --grid/--strip/--only review, quality gates). Piper TTS installed at ~/.local/share/piper-voices/.
 
 ## Now
-- OPUS-VIDEO-PLAYBOOK.md written (distills v1/v2 runs + all gathered guidance).
-- Awaiting user reaction + answer on commit (RESEARCH.md, CONTINUITY.md, OPUS-VIDEO-PLAYBOOK.md, video/, film/, skills/ all untracked).
+- Committed + pushed root commit 9f5ac65 to origin/main (103 files; ~1.4GB regenerable mass gitignored).
+- Work continues in new thread T-01a0de66-d17b-756c-a59f-317895d715e6 (kimi-k3): ARCHITECTURE.md per RESEARCH.md §5/§6 + §7 answers.
 
 ## Next
 - Pick from open questions §7 (substrate bake-off criteria; durable-execution engine choice; code-mode executor placement; data residency).
