@@ -1,0 +1,9 @@
+node_modules/
+.amp/
+film/out/*
+!film/out/index-grid.jpg
+film/audio/*.wav
+film/out/.index-render-*/
+video/out/
+video/remotion/
+*.log

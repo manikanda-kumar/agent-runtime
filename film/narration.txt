@@ -1,0 +1,14 @@
+Agent runtimes. A short history, drawn by hand.
+For thirty years, computing has repeated one move. Shrink the unit, raise the density.
+Nineteen ninety eight. The machine. A whole virtual computer, ten to a host. Isolation at any cost.
+Twenty thirteen. The process. The container image wins, and state is exiled.
+Twenty fourteen. The event. Functions, then Firecracker. Virtual machine isolation at container speed.
+Twenty seventeen. The isolate. A million little runtimes on a single host.
+Twenty twenty. The record. Identity, state and mailbox move back in, beside the compute.
+Agents arrive needing all of it.
+A sandbox, to run code the model just wrote.
+A ledger, which answers the only question that matters. What survives when the compute dies?
+And code mode. The agent writes code to call its tools.
+Isolation is a staircase. Interpreter, isolate, container, micro V M. Blast radius decides the tier.
+So. Buy the sandbox substrate.
+Build the control plane.

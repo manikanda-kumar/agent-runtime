@@ -1,0 +1,459 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>agent runtimes — a sketchbook history</title>
+<style>body{margin:0;background:#26241f;display:grid;place-items:center;min-height:100vh}canvas{max-width:100vw;max-height:100vh;object-fit:contain}</style>
+<canvas id="c"></canvas>
+<script src="core.js"></script>
+<script src="studio.js"></script>
+<script src="cels.js"></script>
+<script src="materials.js"></script>
+<script src="letters.js"></script>
+<script>
+'use strict';
+// ============================================================
+// agent runtimes — a sketchbook history
+// Ink and watercolour on warm cartridge paper. See brief.md for the full brief.
+//
+// Beat sheet (seconds, cut on narration sentence boundaries):
+//   0.000  4.958  TITLE     a computer is drawn; the title writes itself
+//   4.958 34.292  ERAS      a timeline grows; five vignettes draw on arrival
+//  39.250 14.917  AGENT     sandbox / ledger / code mode, three panels
+//  54.167  7.417  STAIRS    the isolation gradient, a marker hops up
+//  61.583  8.250  TAKEAWAY  two lines, a beat between them, a sign-off that holds
+//
+// Invariants kept here: the paper never boils (fixed seed), washes never boil
+// (fixed seed, held with the drawing), only the pen line is redrawn — eight
+// times a second, from tau, never from the output frame number.
+// ============================================================
+
+const PAPER_SEED = 5;
+const PALETTE = makePalette({
+  paper: '#f2e5cd',
+  paperBand: 'rgba(255,241,206,.20)',
+  ink: '#252038',
+}, 'paperInk');
+
+// Watercolour box. Six pans, mixed off the palette; no hue arrives from nowhere.
+const C = {
+  ochre: '#d79a52', rust: '#c05e38', slate: '#4a6b9c', teal: '#5f9f97',
+  gold: '#e2b348', red: '#c2453c', sage: '#8e9a63', bone: '#fbf4e4', lilac: '#8878ab',
+};
+
+// ---------- the pen ----------
+// One tapering brush line. `boil` is a seed that steps 8x/sec: the line is redrawn,
+// the drawing is not. Endpoints and landmarks stay where they were authored.
+const boilSeed = tau => Math.floor(tau * 8) * 19;
+
+function inkStroke(c, pts, o = {}) {
+  brush(c, o.poly ? dens(pts, !!o.close, 9) : pts, {
+    w: o.w ?? 3.1, color: o.color ?? PAL.ink, p: o.p ?? 1,
+    seed: (o.seed ?? 1) + (o.boil ?? 0), amp: o.amp ?? 1.5,
+    taper: o.taper ?? .75, close: !!o.close, al: o.al ?? 1, smooth: o.smooth !== false,
+  });
+}
+
+// ---------- authored drawings ----------
+// A drawing is a finite list of strokes in local units plus the washes that sit
+// under them. `at` is where in the pen's journey a wash arrives, 0..1.
+function glyph(def) {
+  const strokes = def.strokes.map(s => ({ ...s, len: Math.max(10, pathLength(s.pts, !!s.close)) }));
+  return { strokes, washes: def.washes || [], total: strokes.reduce((a, s) => a + s.len, 0) };
+}
+function drawGlyph(c, g, { x = 0, y = 0, s = 1, p = 1, boil = 0, seed = 1 } = {}) {
+  if (p <= 0) return;
+  c.save(); c.translate(x, y); if (s !== 1) c.scale(s, s);
+  for (const [i, wsh] of g.washes.entries()) {
+    const k = clamp((p - (wsh.at ?? .3)) / .3, 0, 1); if (k <= 0) continue;
+    wash(c, splinePath(wsh.poly ? dens(wsh.pts, true, 9) : wsh.pts, wsh.close !== false), wsh.color, { al: (wsh.al ?? .32) * easeOut(k), off: wsh.off ?? 6, seed: seed * 13 + i * 5 });
+  }
+  const want = g.total * clamp(p, 0, 1); let acc = 0;
+  for (const [i, st] of g.strokes.entries()) {
+    const local = clamp((want - acc) / st.len, 0, 1); acc += st.len;
+    if (local <= 0) break;
+    inkStroke(c, st.pts, { ...st, p: local, boil, seed: seed * 7 + i * 3 });
+  }
+  c.restore();
+}
+const S_ = (pts, w = 3.1, extra = {}) => ({ pts, w, ...extra });
+
+// Angular forms are resampled along their edges before the brush splines them,
+// so a cabinet keeps its corners instead of relaxing into a pill.
+function dens(pts, close = false, step = 9) {
+  const out = [], n = pts.length, segs = close ? n : n - 1;
+  for (let i = 0; i < segs; i++) {
+    const q = pts[i], r = pts[(i + 1) % n], m = Math.max(1, Math.round(Math.hypot(r[0] - q[0], r[1] - q[1]) / step));
+    for (let k = 0; k < m; k++) out.push([lerp(q[0], r[0], k / m), lerp(q[1], r[1], k / m)]);
+  }
+  if (!close) out.push(pts[n - 1].slice());
+  return out;
+}
+const R_ = (pts, w = 3.1, extra = {}) => ({ pts, w, close: true, poly: true, ...extra });
+
+// --- a desk computer, for the title card ---
+const G_COMPUTER = glyph({
+  washes: [
+    { pts: [[-88, -66], [86, -70], [88, 28], [-90, 32]], color: C.slate, al: .34, at: .52, off: 6, poly: true },
+  ],
+  strokes: [
+    R_([[-118, -90], [116, -94], [120, 58], [-116, 62]], 3.8),
+    R_([[-88, -66], [86, -70], [88, 28], [-90, 32]], 2.4),
+    S_([[-34, 62], [-44, 98]], 3.0), S_([[36, 60], [46, 96]], 3.0),
+    S_([[-78, 100], [80, 96]], 3.6),
+    S_([[-64, -38], [-26, -40]], 3.4), S_([[-64, -12], [16, -15]], 2.2),
+    S_([[-64, 10], [-18, 8]], 2.2), S_([[8, 10], [44, 8]], 2.2),
+    S_([[-104, -104], [-112, -126]], 1.9), S_([[-76, -110], [-80, -134]], 1.9), S_([[-48, -112], [-46, -136]], 1.9),
+  ],
+});
+
+// --- Act I: a server cabinet. Tall, narrow, heavy on its feet. ---
+const BAY = k => [[-56, -122 + k * 48], [56, -124 + k * 48], [56, -100 + k * 48], [-56, -98 + k * 48]];
+const G_CABINET = glyph({
+  washes: [
+    { pts: [[-76, -152], [76, -156], [80, 150], [-78, 154]], color: C.ochre, al: .11, at: .40, off: 8, poly: true },
+    ...Array.from({ length: 5 }, (_, k) => ({ pts: BAY(k), color: C.slate, al: .34, at: .52 + k * .04, poly: true })),
+    { pts: [[26, 116], [44, 115], [44, 132], [26, 133]], color: C.red, al: .55, at: .85, poly: true },
+  ],
+  strokes: [
+    R_([[-76, -152], [76, -156], [80, 150], [-78, 154]], 4.0),
+    S_([[-62, 154], [-66, 178]], 3.2), S_([[64, 152], [68, 176]], 3.2),
+    ...Array.from({ length: 5 }, (_, k) => R_(BAY(k), 2.1)),
+    ...Array.from({ length: 5 }, (_, k) => S_([[-44, -111 + k * 48], [-14, -112 + k * 48]], 1.6)),
+    S_([[-56, 116], [56, 114]], 1.7), S_([[-56, 134], [8, 133]], 1.7),
+    R_([[26, 116], [44, 115], [44, 132], [26, 133]], 1.9),
+  ],
+});
+
+// --- Act II: a shipping container. Wide, ribbed, the image as a portable artefact. ---
+const G_CONTAINER = glyph({
+  washes: [
+    { pts: [[-152, -74], [150, -78], [154, 74], [-154, 78]], color: C.rust, al: .30, at: .42, off: 8, poly: true },
+    { pts: [[92, -76], [124, -77], [125, 76], [93, 77]], color: C.rust, al: .24, at: .62, poly: true },
+  ],
+  strokes: [
+    R_([[-152, -74], [150, -78], [154, 74], [-154, 78]], 4.0),
+    S_([[-150, -58], [148, -62]], 2.1), S_([[-151, 58], [150, 55]], 2.1),
+    ...Array.from({ length: 9 }, (_, k) => S_([[-124 + k * 26, -56], [-122 + k * 26, 56]], 1.6)),
+    S_([[92, -76], [93, 76]], 2.5), S_([[124, -77], [125, 77]], 2.5),
+    S_([[104, -12], [104, 26]], 2.1), S_([[114, -12], [114, 26]], 2.1),
+    R_([[-152, -74], [-136, -74], [-136, -58], [-152, -58]], 1.8),
+    R_([[150, -78], [134, -78], [134, -62], [150, -62]], 1.8),
+    R_([[-154, 78], [-138, 78], [-138, 60], [-154, 60]], 1.8),
+    R_([[154, 74], [138, 74], [138, 57], [154, 57]], 1.8),
+  ],
+});
+
+// --- Act III: a bolt of lightning and a firecracker chip. Angular, never smoothed. ---
+const BOLT_PTS = [[-54, -152], [-110, -18], [-64, -14], [-100, 116], [4, -26], [-44, -30], [10, -152]];
+const G_BOLT = glyph({
+  washes: [
+    { pts: BOLT_PTS, color: C.gold, al: .45, at: .40, off: 7, poly: true },
+    { pts: [[56, 10], [116, 8], [118, 68], [54, 70]], color: C.red, al: .32, at: .60, poly: true },
+  ],
+  strokes: [
+    R_(BOLT_PTS, 4.0, { amp: 1.2 }),
+    R_([[56, 10], [116, 8], [118, 68], [54, 70]], 3.0),
+    S_([[68, 24], [104, 23]], 1.7), S_([[68, 40], [104, 39]], 1.7), S_([[68, 56], [92, 55]], 1.7),
+    S_([[86, 8], [92, -16], [114, -30]], 2.3),
+    ...Array.from({ length: 6 }, (_, k) => {
+      const a = -2.0 + k * .58, r0 = 30, r1 = 66 + (k % 3) * 11;
+      return S_([[114 + Math.cos(a) * r0, -30 + Math.sin(a) * r0], [114 + Math.cos(a) * r1, -30 + Math.sin(a) * r1]], 2.0);
+    }),
+  ],
+});
+
+// --- Act IV: a field of isolates. Many, tiny, nearly identical — that is the point. ---
+const CELL = k => { const col = k % 8, row = (k / 8) | 0, x = -142 + col * 38, y = -70 + row * 30; return [[x, y], [x + 32, y - 1], [x + 32, y + 24], [x, y + 25]]; };
+const G_CELLS = glyph({
+  washes: [
+    { pts: [[-176, -40], [-120, -96], [0, -108], [128, -94], [178, -30], [160, 56], [70, 102], [-40, 106], [-150, 72]], color: C.teal, al: .15, at: .38, off: 10 },
+    { pts: CELL(3), color: C.teal, al: .5, at: .45, poly: true },
+    { pts: CELL(17), color: C.teal, al: .5, at: .58, poly: true },
+    { pts: CELL(28), color: C.teal, al: .5, at: .70, poly: true },
+    { pts: CELL(38), color: C.teal, al: .5, at: .80, poly: true },
+  ],
+  strokes: [
+    ...Array.from({ length: 40 }, (_, k) => R_(CELL(k), 1.7, { amp: 1.1 })),
+    ...[2, 9, 14, 21, 26, 33, 37, 6].map((k, j) => {
+      const q = CELL(k), x = q[0][0] + 16, y = q[0][1] + 12;
+      return S_([[x - 5, y], [x + 5, y - 1]], 1.8);
+    }),
+    R_([[-190, 46], [-164, 45], [-164, 68], [-190, 69]], 1.5),
+    R_([[178, -74], [202, -75], [202, -52], [178, -51]], 1.5),
+    R_([[188, 44], [210, 43], [210, 64], [188, 65]], 1.4, { al: .6 }),
+    R_([[-202, -66], [-182, -67], [-182, -48], [-202, -47]], 1.4, { al: .6 }),
+  ],
+});
+
+// --- Act V: the ledger. A curved silhouette after four boxy ones. ---
+const G_LEDGER = glyph({
+  washes: [
+    { pts: [[0, -96], [-72, -114], [-144, -92], [-150, 64], [-78, 84], [0, 86]], color: C.bone, al: .8, at: .40, off: 5 },
+    { pts: [[0, -96], [72, -114], [144, -92], [150, 64], [78, 84], [0, 86]], color: C.bone, al: .8, at: .48, off: 5 },
+    { pts: [[16, 82], [14, 138], [32, 122], [44, 146], [48, 88]], color: C.red, al: .55, at: .85 },
+  ],
+  strokes: [
+    S_([[0, -96], [-72, -114], [-144, -92], [-150, 64], [-78, 84], [0, 86]], 3.6, { close: true }),
+    S_([[0, -96], [72, -114], [144, -92], [150, 64], [78, 84], [0, 86]], 3.6, { close: true }),
+    S_([[0, -96], [0, 86]], 2.7),
+    ...Array.from({ length: 5 }, (_, k) => S_([[-132, -62 + k * 30], [-18, -68 + k * 30]], 1.6)),
+    ...Array.from({ length: 5 }, (_, k) => S_([[18, -68 + k * 30], [132, -62 + k * 30]], 1.6)),
+    S_([[-124, -82], [-58, -86]], 2.2), S_([[32, -88], [110, -84]], 2.2),
+    S_([[16, 82], [14, 138], [32, 122], [44, 146], [48, 88]], 2.5, { close: true }),
+    S_([[-150, 64], [-146, 78], [-76, 98], [0, 100], [76, 98], [146, 78], [150, 64]], 2.3),
+  ],
+});
+
+// --- the agent era: a tray of sand with a page of code standing in it ---
+const G_SANDBOX = glyph({
+  washes: [
+    { pts: [[-142, 42], [-70, 30], [0, 36], [72, 28], [142, 38], [142, 112], [-142, 114]], color: C.ochre, al: .5, at: .44, off: 3, poly: true },
+    { pts: [[-58, -92], [54, -98], [58, 34], [-54, 40]], color: C.bone, al: .82, at: .56, poly: true },
+  ],
+  strokes: [
+    R_([[-150, 8], [150, 4], [152, 122], [-152, 126]], 3.8),
+    S_([[-144, 40], [-70, 28], [0, 34], [72, 26], [144, 36]], 2.6),
+    R_([[-58, -92], [54, -98], [58, 34], [-54, 40]], 3.0),
+    S_([[-42, -68], [36, -73]], 2.0), S_([[-42, -44], [6, -48]], 2.0),
+    S_([[-42, -20], [28, -24]], 2.0), S_([[-42, 4], [-4, 1]], 2.0),
+    ...[-150, -114, -88, 88, 114, 150].map(x => S_([[x, 10], [x + 2, -70]], 2.6)),
+    S_([[-158, -36], [-80, -39]], 2.2), S_([[80, -40], [158, -43]], 2.2),
+  ],
+});
+
+// --- the agent era: a bound ledger, shut, with a strap ---
+const G_BOUND = glyph({
+  washes: [
+    { pts: [[-82, -110], [68, -118], [70, 96], [-80, 106]], color: C.slate, al: .40, at: .44, off: 7, poly: true },
+    { pts: [[68, -118], [92, -104], [94, 110], [70, 96]], color: C.bone, al: .75, at: .56, poly: true },
+    { pts: [[-78, -33], [86, -43], [86, -9], [-78, 1]], color: C.red, al: .42, at: .70, off: 3, poly: true },
+  ],
+  strokes: [
+    R_([[-82, -110], [68, -118], [70, 96], [-80, 106]], 3.8),
+    R_([[68, -118], [92, -104], [94, 110], [70, 96]], 2.9),
+    S_([[70, -100], [92, -88]], 1.5), S_([[70, -78], [92, -66]], 1.5), S_([[70, -56], [92, -44]], 1.5),
+    S_([[70, 22], [93, 34]], 1.5), S_([[70, 44], [93, 56]], 1.5), S_([[70, 66], [93, 78]], 1.5),
+    S_([[-82, -34], [94, -44]], 2.7), S_([[-82, 2], [94, -8]], 2.7),
+    R_([[54, -46], [82, -48], [83, -6], [55, -4]], 2.3),
+    R_([[-58, -94], [40, -100], [42, -62], [-56, -56]], 2.3),
+    S_([[-46, -84], [26, -88]], 1.6), S_([[-46, -72], [8, -75]], 1.6),
+    S_([[-70, 22], [34, 16]], 1.7), S_([[-70, 44], [18, 38]], 1.7), S_([[-70, 66], [40, 60]], 1.7),
+  ],
+});
+
+// --- the agent era: code mode. Braces, and the tool they turn. ---
+const GEAR = [[206, 34], [193.1, 40.7], [200.9, 53], [186.4, 52.4], [187, 66.9], [174.7, 59.1], [168, 72], [161.3, 59.1], [149, 66.9], [149.6, 52.4], [135.1, 53], [142.9, 40.7], [130, 34], [142.9, 27.3], [135.1, 15], [149.6, 15.6], [149, 1.1], [161.3, 8.9], [168, -4], [174.7, 8.9], [187, 1.1], [186.4, 15.6], [200.9, 15], [193.1, 27.3]];
+const G_BRACES = glyph({
+  washes: [
+    { pts: [[-54, -66], [46, -72], [48, 58], [-52, 64]], color: C.sage, al: .22, at: .46, off: 6, poly: true },
+    { pts: GEAR, color: C.gold, al: .5, at: .82, poly: true },
+  ],
+  strokes: [
+    S_([[-64, -104], [-100, -88], [-100, -18], [-130, 0], [-100, 18], [-100, 88], [-64, 104]], 4.4),
+    S_([[72, -104], [108, -88], [108, -18], [138, 0], [108, 18], [108, 88], [72, 104]], 4.4),
+    S_([[-50, -62], [36, -66]], 2.5), S_([[-50, -28], [6, -32]], 2.5),
+    S_([[-50, 6], [46, 2]], 2.5), S_([[-50, 40], [-4, 36]], 2.5),
+    S_(GEAR, 2.4, { close: true, poly: true, amp: 1.1 }),
+    S_([[180, 34], [178.4, 40], [174, 44.4], [168, 46], [162, 44.4], [157.6, 40], [156, 34], [157.6, 28], [162, 23.6], [168, 22], [174, 23.6], [178.4, 28]], 2.0, { close: true, poly: true, amp: 1.0 }),
+  ],
+});
+
+// ---------- page furniture ----------
+function sheet(c, seed = PAPER_SEED) {
+  paper(c, PAL.paper, PAL.paperBand, seed);
+  grain(c, rectPath(0, 0, W, H), [0, 0, W, H], 2600, '#6b5a3c', .055, seed + 41, 1.5);
+}
+// A rectangle drawn by hand: four separate passes, corners left slightly open.
+function panelFrame(c, x, y, w, h, { p = 1, boil = 0, seed = 1, width = 3.2 } = {}) {
+  const e = 10, sides = [
+    [[x - w / 2 - e, y - h / 2], [x + w / 2 + e * .4, y - h / 2 - 4]],
+    [[x + w / 2, y - h / 2 - e], [x + w / 2 + 3, y + h / 2 + e * .5]],
+    [[x + w / 2 + e, y + h / 2], [x - w / 2 - e * .5, y + h / 2 + 4]],
+    [[x - w / 2, y + h / 2 + e], [x - w / 2 - 3, y - h / 2 - e * .6]],
+  ];
+  sides.forEach((s, i) => {
+    const local = clamp(p * 4 - i, 0, 1); if (local <= 0) return;
+    inkStroke(c, s, { w: width, p: local, boil, seed: seed * 11 + i * 5, amp: 2.2 });
+  });
+}
+
+// ============================================================
+// SCENE 1 — title card
+// ============================================================
+function sceneTitle(c, tau) {
+  sheet(c); resetT(c);
+  const b = boilSeed(tau);
+  drawGlyph(c, G_COMPUTER, { x: CX, y: 752, s: 1.72, p: sm(.15, 1.75, tau, easeOut), boil: b, seed: 3 });
+  letterText(c, 'agent runtimes', CX, 372, { size: 156, align: 'center', boil: b, seed: 21, p: sm(.85, 2.45, tau), tracking: 8 });
+  const sub = sm(2.15, 3.15, tau);
+  letterText(c, 'a sketchbook history', CX, 474, { size: 62, align: 'center', boil: b, seed: 22, p: sub });
+  if (sub > .85) inkStroke(c, [[CX - 400, 512], [CX - 20, 506], [CX + 392, 514]], { w: 2.6, p: clamp((sub - .85) / .15, 0, 1), boil: b, seed: 44, amp: 2.6 });
+}
+
+// ============================================================
+// SCENE 2 — the arc. A timeline grows; five vignettes draw on arrival.
+// The camera holds still through every sentence and moves only in the gaps.
+// ============================================================
+const TY = 850, EX = k => 600 + k * 1200, T0 = -40, T1 = 6000;
+const ERAS = [
+  { year: '1998', name: 'THE MACHINE', line: 'isolation at any cost', dens: '~10 / host', g: G_CABINET, s: 1.45, gy: 340 },
+  { year: '2013', name: 'THE PROCESS', line: 'the image wins; state exiled', dens: '~100s / host', g: G_CONTAINER, s: 2.55, gy: 350 },
+  { year: '2014-18', name: 'THE EVENT', line: 'VM isolation at container speed', dens: '~1000s / host', g: G_BOLT, s: 1.6, gy: 345 },
+  { year: '2017', name: 'THE ISOLATE', line: 'a million little runtimes', dens: '~1M / host', g: G_CELLS, s: 2.35, gy: 355 },
+  { year: '2020', name: 'THE RECORD', line: 'identity + state + mailbox reunite', dens: '~millions, hibernating', g: G_LEDGER, s: 2.0, gy: 345 },
+];
+const ERA_IN = [4.85, 12.30, 17.20, 23.75, 28.65];
+const CAM_ERAS = [
+  [0, 1900, 800, .46], [4.05, 1900, 800, .46],
+  [5.45, EX(0), CY, 1], [11.59, EX(0), CY, 1],
+  [12.44, EX(1), CY, 1], [16.48, EX(1), CY, 1],
+  [17.33, EX(2), CY, 1], [23.03, EX(2), CY, 1],
+  [23.88, EX(3), CY, 1], [27.91, EX(3), CY, 1],
+  [28.76, EX(4), CY, 1], [34.30, EX(4), CY, 1],
+];
+
+function eraVignette(c, k, p, b) {
+  if (p <= 0) return;
+  const e = ERAS[k], x = EX(k);
+  drawGlyph(c, e.g, { x, y: e.gy, s: e.s, p: clamp(p / .62, 0, 1), boil: b, seed: 30 + k * 6 });
+  const q = clamp((p - .42) / .34, 0, 1), r = clamp((p - .58) / .32, 0, 1), s2 = clamp((p - .72) / .28, 0, 1);
+  letterText(c, e.name, x, 688, { size: 76, align: 'center', boil: b, seed: 50 + k, p: q, tracking: 14 });
+  letterText(c, e.line, x, 768, { size: 56, align: 'center', boil: b, seed: 60 + k, p: r, color: mix(PAL.ink, C.rust, .45) });
+  letterText(c, e.dens, x, 1026, { size: 38, align: 'center', boil: b, seed: 80 + k, p: s2, color: mix(PAL.ink, C.slate, .5) });
+}
+
+function sceneEras(c, tau) {
+  sheet(c, 7);
+  const b = boilSeed(tau);
+  const v = key(tau, CAM_ERAS, easeInOutSine);
+  cam(c, v[0], v[1], v[2]);
+  // the timeline itself
+  // the pen stays ahead of the camera: the line is always being drawn just off the right edge
+  const front = v[0] + 1060 / v[2];
+  const tp = Math.min(clamp((front - T0) / (T1 - T0), 0, 1), sm(.3, 2.4, tau, easeIO));
+  inkStroke(c, [[T0, TY + 5], [1500, TY - 4], [3000, TY + 3], [4500, TY - 3], [T1, TY + 4]], { w: 5.4, p: tp, boil: b, seed: 4, amp: 2.4 });
+  if (tp > .95) inkStroke(c, [[T1 - 60, TY - 26], [T1 + 8, TY + 4], [T1 - 58, TY + 34]], { w: 4.0, p: clamp((tp - .95) / .05, 0, 1), boil: b, seed: 5 });
+  for (let k = 0; k < 5; k++) {
+    const tick = clamp((tp - ((EX(k) - T0) / (T1 - T0) + .012)) / .05, 0, 1);
+    if (tick <= 0) continue;
+    inkStroke(c, [[EX(k), TY - 34], [EX(k) + 2, TY + 22]], { w: 3.2, p: tick, boil: b, seed: 100 + k });
+    letterText(c, ERAS[k].year, EX(k), 966, { size: 84, align: 'center', boil: b, seed: 70 + k, p: clamp(tick * 1.6 - .25, 0, 1) });
+  }
+  // the premise, held on the wide shot only
+  const pr = clamp(sm(.7, 2.4, tau) - sm(4.45, 5.05, tau), 0, 1);
+  if (pr > 0) {
+    c.save(); resetT(c);
+    letterText(c, 'shrink the unit.', CX, 344, { size: 92, align: 'center', boil: b, seed: 11, p: clamp(pr / .55, 0, 1), al: Math.min(1, pr * 2.2) });
+    letterText(c, 'raise the density.', CX, 458, { size: 92, align: 'center', boil: b, seed: 12, p: clamp((pr - .3) / .55, 0, 1), al: Math.min(1, pr * 2.2) });
+    c.restore();
+  }
+  for (let k = 0; k < 5; k++) {
+    if (Math.abs(EX(k) - v[0]) > 1000 / v[2] + 700) continue;
+    eraVignette(c, k, sm(ERA_IN[k], ERA_IN[k] + 2.3, tau, easeOut), b);
+  }
+}
+
+// ============================================================
+// SCENE 3 — the agent era. Three panels, drawn one sentence at a time.
+// ============================================================
+const PANELS = [
+  { x: 322, title: 'SANDBOX', g: G_SANDBOX, s: 1.12, labels: ['E2B', 'Modal', 'Vercel', 'AWS'], in: 2.30 },
+  { x: 960, title: 'LEDGER', g: G_BOUND, s: 1.22, labels: ['Durable Objects', 'Rivet', 'Temporal'], in: 5.55 },
+  { x: 1598, title: 'CODE MODE', g: G_BRACES, s: 1.15, labels: ['agents write code', 'to call their tools'], in: 11.15 },
+];
+function sceneAgent(c, tau) {
+  sheet(c, 9); resetT(c);
+  const b = boilSeed(tau);
+  letterText(c, 'the agent era needs all of it', CX, 148, { size: 78, align: 'center', boil: b, seed: 13, p: sm(.2, 1.7, tau) });
+  for (const [k, pn] of PANELS.entries()) {
+    panelFrame(c, pn.x, 512, 572, 442, { p: sm(.65 + k * .22, 1.95 + k * .22, tau), boil: b, seed: 5 + k });
+    const p = sm(pn.in, pn.in + 2.1, tau, easeOut); if (p <= 0) continue;
+    letterText(c, pn.title, pn.x, 268, { size: 60, align: 'center', boil: b, seed: 120 + k, p: clamp(p / .3, 0, 1), tracking: 14 });
+    drawGlyph(c, pn.g, { x: pn.x, y: 524, s: pn.s, p: clamp((p - .12) / .55, 0, 1), boil: b, seed: 40 + k * 9 });
+    pn.labels.forEach((L, j) => {
+      const lp = clamp((p - .55 - j * .08) / .17, 0, 1); if (lp <= 0) return;
+      letterText(c, L, pn.x, 812 + j * 48, { size: 40, align: 'center', boil: b, seed: 130 + k * 7 + j, p: lp, color: mix(PAL.ink, C.slate, .42) });
+    });
+  }
+  const q = sm(7.4, 9.2, tau);
+  if (q > 0) letterText(c, 'what survives when the compute dies?', CX, 1044, { size: 46, align: 'center', boil: b, seed: 14, p: q, color: mix(PAL.ink, C.rust, .5) });
+}
+
+// ============================================================
+// SCENE 4 — the isolation gradient. Four tiers, a marker that hops up.
+// ============================================================
+const STAIR = [[-480, 212], [-250, 212], [-250, 90], [-20, 90], [-20, -30], [210, -30], [210, -150], [440, -150]];
+// A shadow band that follows the steps, not a filled block: a drawn tone, not a shape.
+const BAND = [...STAIR, ...STAIR.slice().reverse().map(([x, y]) => [x, y + 46])];
+const TREAD = [[-365, 212], [-135, 90], [95, -30], [325, -150]];
+const TIERS = ['interpreter', 'isolate', 'container', 'microVM'];
+const HOPS = [[3.00, 3.60], [3.90, 4.50], [4.80, 5.40]];
+function sceneStairs(c, tau) {
+  sheet(c, 11); resetT(c);
+  const b = boilSeed(tau);
+  letterText(c, 'the isolation gradient', CX, 158, { size: 78, align: 'center', boil: b, seed: 15, p: sm(.15, 1.5, tau) });
+  c.save(); c.translate(864, 556); c.scale(1.2, 1.2);
+  const sp = sm(.2, 1.85, tau, easeIO);
+  if (sp > .06) wash(c, polyPath(BAND, true), mix(C.slate, C.rust, .38), { al: .24 * clamp((sp - .06) / .5, 0, 1), off: 5, seed: 77 });
+  inkStroke(c, STAIR, { w: 4.2, p: sp, boil: b, seed: 6, poly: true, amp: 1.3 });
+  TIERS.forEach((t, k) => {
+    const lp = sm(1.25 + k * .3, 2.15 + k * .3, tau); if (lp <= 0) return;
+    letterText(c, t, TREAD[k][0], TREAD[k][1] + 80, { size: 38, align: 'center', boil: b, seed: 140 + k, p: lp });
+  });
+  // the marker: a small pin that hops from tread to tread
+  if (tau > 2.35) {
+    let from = 0, to = 0, u = 1;
+    for (let k = 0; k < HOPS.length; k++) if (tau >= HOPS[k][0]) { from = k; to = k + 1; u = clamp((tau - HOPS[k][0]) / (HOPS[k][1] - HOPS[k][0]), 0, 1); }
+    const e = easeIO(u);
+    const mx = lerp(TREAD[from][0], TREAD[to][0], e) + 82;
+    const my = lerp(TREAD[from][1], TREAD[to][1], e) - 38 * Math.sin(Math.PI * u);
+    const mp = sm(2.35, 2.9, tau);
+    c.save(); c.translate(mx, my);
+    wash(c, polyPath([[5, -92], [62, -76], [6, -58]], true), C.red, { al: .55 * mp, off: 3, seed: 78 });
+    inkStroke(c, [[2, -4], [5, -94]], { w: 3.4, p: mp, boil: b, seed: 9 });
+    inkStroke(c, [[5, -92], [62, -76], [6, -58]], { w: 2.8, p: clamp(mp * 1.4 - .3, 0, 1), boil: b, seed: 10, close: true, poly: true });
+    inkStroke(c, [[-16, -4], [22, -5]], { w: 2.8, p: mp, boil: b, seed: 16 });
+    c.restore();
+  }
+  // an axis on the right: the price of the tier
+  const ap = sm(1.9, 3.1, tau);
+  if (ap > 0) {
+    inkStroke(c, [[556, 236], [558, -196]], { w: 3.0, p: ap, boil: b, seed: 18 });
+    inkStroke(c, [[532, -160], [558, -200], [582, -158]], { w: 3.0, p: clamp(ap * 1.5 - .5, 0, 1), boil: b, seed: 19, poly: true });
+  }
+  c.restore();
+  const ap2 = sm(2.4, 3.4, tau);
+  if (ap2 > 0) letterText(c, 'stronger isolation', 1602, 250, { size: 42, align: 'center', boil: b, seed: 20, p: ap2, color: mix(PAL.ink, C.slate, .45) });
+  const cp = sm(5.15, 6.55, tau);
+  if (cp > 0) letterText(c, 'blast radius decides the tier', CX, 1020, { size: 72, align: 'center', boil: b, seed: 17, p: cp, color: mix(PAL.ink, C.rust, .45) });
+}
+
+// ============================================================
+// SCENE 5 — the takeaway. Two lines, a beat between them.
+// ============================================================
+function sceneTakeaway(c, tau) {
+  sheet(c, 13); resetT(c);
+  const b = boilSeed(tau);
+  const a = sm(.15, 2.45, tau), d = sm(3.35, 5.05, tau);
+  if (a > .5) wash(c, splinePath([[CX - 560, 352], [CX + 540, 340], [CX + 548, 420], [CX - 552, 432]], true), C.gold, { al: .20 * clamp((a - .5) * 2, 0, 1), off: 9, seed: 71 });
+  letterText(c, 'Buy the sandbox substrate.', CX, 420, { size: 118, align: 'center', boil: b, seed: 23, p: a, tracking: 7 });
+  if (d > .5) wash(c, splinePath([[CX - 520, 552], [CX + 500, 540], [CX + 508, 620], [CX - 512, 632]], true), C.teal, { al: .22 * clamp((d - .5) * 2, 0, 1), off: 9, seed: 72 });
+  letterText(c, 'Build the control plane.', CX, 620, { size: 118, align: 'center', boil: b, seed: 24, p: d, tracking: 7 });
+  const u = sm(5.05, 5.65, tau);
+  if (u > 0) inkStroke(c, [[CX - 470, 668], [CX - 40, 660], [CX + 466, 670]], { w: 3.4, p: u, boil: b, seed: 25, amp: 2.6 });
+  const s = sm(5.20, 6.10, tau);
+  if (s > 0) letterText(c, 'github.com/manikanda-kumar/agent-runtime', CX, 880, { size: 36, align: 'center', boil: b, seed: 26, p: s, color: mix(PAL.ink, C.slate, .45) });
+}
+
+defineFilm({
+  palette: PALETTE,
+  format: { ar: '16:9', width: 1920 },
+  fps: 24,
+  timeline: [
+    { name: 'title', dur: 119 / 24, fn: sceneTitle },
+    { name: 'eras', dur: 823 / 24, fn: sceneEras },
+    { name: 'agent-era', dur: 358 / 24, fn: sceneAgent },
+    { name: 'stairs', dur: 178 / 24, fn: sceneStairs },
+    { name: 'takeaway', dur: 198 / 24, fn: sceneTakeaway },
+  ],
+});
+</script>
