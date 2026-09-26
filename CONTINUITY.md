@@ -22,11 +22,10 @@ Build understanding, then design, an internal **agent runtime** for async Jira t
 - Video prompt guidance gathered: storyboard + visual direction + energy pacing in the prompt = reliable one-shot (Addy Osmani thread; trq212: "10k characters with good takes plus skills, examples"); evan.romeos.cc leidenfrost transcript = reference workflow (HTML film → visual QA pass → narration FIRST → retime → render → sound design); alesha-pro SKILL.md = production playbook (brief template, beat sheet, --grid/--strip/--only review, quality gates). Piper TTS installed at ~/.local/share/piper-voices/.
 
 ## Now
-- Root commit 9f5ac65 (103 files) pushed earlier; ARCHITECTURE.md written/committed/pushed in delegated thread T-01a0de66-d17b-756c-a59f-317895d715e6 (control-plane design; RESEARCH.md §7 questions decided with reversal triggers). Awaiting user review.
-- Also delivered there: curated history-of-compute-runtimes reading/watching list (Disco→Docker→Firecracker→WASM→Erlang/Orleans/Temporal) via bookmark recall + web search.
+- ARCHITECTURE.md **accepted, no changes** (review complete via source thread). M0 not started — awaiting owner's go/no-go in main thread; standing by.
 
 ## Next
-- User review of ARCHITECTURE.md → then M0 walking skeleton (Record+Journal, disposable Runner, Jira adapter, E2B T3, comment approvals).
+- On owner's approval: M0 walking skeleton (Record+Journal, disposable Runner, Jira adapter, E2B T3, comment approvals).
 
 ## Open questions
 - None blocking. RESEARCH.md §7 questions decided in ARCHITECTURE.md §10, each with a reversal trigger.
