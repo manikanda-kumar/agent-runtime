@@ -9,11 +9,10 @@ Build understanding, then design, an internal **agent runtime** for async Jira t
 - Prior context: `tools` MCP blueprint (stable gateway + HA replicas + Firecracker per-job isolation; runtime/gateway bake-off pending); `sandboxagent` project (Session→Runner→Worktree→Optional Sandbox layering; agentOS as substrate, not state).
 
 ## Key decisions
-- None yet (research phase).
+- ARCHITECTURE.md (committed): buy substrate (E2B default T3), build control plane (Record+Journal in Postgres, channel adapters, policy/approval gates, 4-tier Executor). §7 open questions closed: (1) bake-off criteria set, gate at M1; (2) GPUs parked; (3) own journal w/ Temporal discipline, Temporal = named escape hatch; (4) code-mode in control-plane isolates, no creds in sandboxes; (5) residency via architecture + data classes, self-host E2B as rehearsed insurance.
 
 ## State
-- `RESEARCH.md` written: full history (VMware→Docker→K8s→serverless/Firecracker→isolates/WASM→actors/durable execution), agent-era three waves (sandboxes, coordination records, code-mode), six broken assumptions, requirements mapping, build-vs-buy split, 5 open questions.
-- Uncommitted; repo was empty (no commits yet) at start.
+- `RESEARCH.md` + `ARCHITECTURE.md` committed on origin/main. Research doc: full history, agent-era three waves, six broken assumptions, requirements mapping, build-vs-buy split. Architecture doc: control-plane design + §10 closes all 5 open questions with reversal triggers.
 
 ## Done
 - Recalled prior Field Theory context (Modal CTO talk notes, Vercel Sandbox saves, E2B stars, sandboxagent/tools projects).
@@ -23,15 +22,14 @@ Build understanding, then design, an internal **agent runtime** for async Jira t
 - Video prompt guidance gathered: storyboard + visual direction + energy pacing in the prompt = reliable one-shot (Addy Osmani thread; trq212: "10k characters with good takes plus skills, examples"); evan.romeos.cc leidenfrost transcript = reference workflow (HTML film → visual QA pass → narration FIRST → retime → render → sound design); alesha-pro SKILL.md = production playbook (brief template, beat sheet, --grid/--strip/--only review, quality gates). Piper TTS installed at ~/.local/share/piper-voices/.
 
 ## Now
-- Committed + pushed root commit 9f5ac65 to origin/main (103 files; ~1.4GB regenerable mass gitignored).
-- Work continues in new thread T-01a0de66-d17b-756c-a59f-317895d715e6 (kimi-k3): ARCHITECTURE.md per RESEARCH.md §5/§6 + §7 answers.
+- Root commit 9f5ac65 (103 files) pushed earlier; ARCHITECTURE.md written/committed/pushed in delegated thread T-01a0de66-d17b-756c-a59f-317895d715e6 (control-plane design; RESEARCH.md §7 questions decided with reversal triggers). Awaiting user review.
+- Also delivered there: curated history-of-compute-runtimes reading/watching list (Disco→Docker→Firecracker→WASM→Erlang/Orleans/Temporal) via bookmark recall + web search.
 
 ## Next
-- Pick from open questions §7 (substrate bake-off criteria; durable-execution engine choice; code-mode executor placement; data residency).
-- Likely follow-up: turn §5/§6 into an architecture doc for the internal runtime.
+- User review of ARCHITECTURE.md → then M0 walking skeleton (Record+Journal, disposable Runner, Jira adapter, E2B T3, comment approvals).
 
 ## Open questions
-- See RESEARCH.md §7 (bake-off criteria, GPUs, durable-execution engine, code-mode placement, residency/BYOC).
+- None blocking. RESEARCH.md §7 questions decided in ARCHITECTURE.md §10, each with a reversal trigger.
 
 ## Working set
 - `RESEARCH.md`, `CONTINUITY.md`
