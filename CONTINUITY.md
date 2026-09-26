@@ -22,10 +22,11 @@ Build understanding, then design, an internal **agent runtime** for async Jira t
 - Video prompt guidance gathered: storyboard + visual direction + energy pacing in the prompt = reliable one-shot (Addy Osmani thread; trq212: "10k characters with good takes plus skills, examples"); evan.romeos.cc leidenfrost transcript = reference workflow (HTML film → visual QA pass → narration FIRST → retime → render → sound design); alesha-pro SKILL.md = production playbook (brief template, beat sheet, --grid/--strip/--only review, quality gates). Piper TTS installed at ~/.local/share/piper-voices/.
 
 ## Now
-- ARCHITECTURE.md **accepted, no changes** (review complete via source thread). M0 not started — awaiting owner's go/no-go in main thread; standing by.
+- ARCHITECTURE.md live at 05e84f5 on origin/main, **accepted with no changes** (main-thread review complete; relayed to child T-01a0de66-d17b-756c-a59f-317895d715e6).
+- Blocked on one owner decision: approve starting M0 walking skeleton. M0 exit needs ≥5 real Jira tasks, which requires a real Jira webhook + creds not yet provisioned.
 
 ## Next
-- On owner's approval: M0 walking skeleton (Record+Journal, disposable Runner, Jira adapter, E2B T3, comment approvals).
+- User approves/adjusts M0 → then start walking skeleton (Record+hash-chained journal, disposable Runner w/ journal re-drive, Jira adapter only, E2B T3 only, comment-reply approvals, audit export).
 
 ## Open questions
 - None blocking. RESEARCH.md §7 questions decided in ARCHITECTURE.md §10, each with a reversal trigger.
